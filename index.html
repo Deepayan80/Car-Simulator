@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Journey Simulator</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  text-align:center;
+  color:white;
+  overflow:hidden;
+}
+.video-bg iframe{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:-1;
+  pointer-events:none;
+}
+.dashboard{
+  background:rgba(255,255,255,0.9);
+  color:black;
+  max-width:640px;
+  margin:25px auto;
+  padding:20px;
+  border-radius:12px;
+}
+.stat{
+  display:inline-block;
+  width:130px;
+  background:white;
+  padding:10px;
+  margin:6px;
+  border-radius:8px;
+}
+.dial{
+  width:150px;
+  height:150px;
+  border-radius:50%;
+  background:black;
+  color:#0f0;
+  font-size:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:15px auto;
+  border:4px solid #0f0;
+}
+button{
+  padding:8px 16px;
+  margin:6px;
+  font-size:14px;
+  cursor:pointer;
+}
+.controls button{
+  font-size:18px;
+  width:50px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Background Video -->
+<div class="video-bg">
+  <iframe src="https://www.youtube.com/embed/jAVF8mfrrTA?autoplay=1&mute=1&loop=1&playlist=jAVF8mfrrTA"></iframe>
+</div>
+
+<h1>Car Journey Simulator</h1>
+
+<div class="dashboard">
+
+  <button onclick="startDrive()">Start Engine</button>
+  <button onclick="stopDrive()">Stop Engine</button>
+  <button onclick="refuel()">Refuel</button>
+
+  <div class="dial" id="speedDial">0 km/h</div>
+
+  <div class="controls">
+    <button onclick="decreaseSpeed()">−</button>
+    <button onclick="increaseSpeed()">+</button>
+  </div>
+
+  <div>
+    <div class="stat">Trip Distance<br><span id="trip">0.00</span> km</div>
+    <div class="stat">Total Odometer<br><span id="odo">0.00</span> km</div>
+    <div class="stat">Fuel<br><span id="fuel">100</span>%</div>
+    <div class="stat">Trip Time<br><span id="time">00:00:00</span></div>
+  </div>
+
+</div>
+
+<script>
+/* ================== CONSTANTS ================== */
+const mileage = 8.7;          // km per liter
+const tankCapacity = 86;      // liters
+const MAX_SPEED = 290;        // km/h (UPDATED)
+const SPEED_STEP = 1;         // km/h per click (UPDATED)
+
+/* ================== PERSISTENT DATA ================== */
+let odometer = parseFloat(localStorage.getItem("odometer")) || 0;
+let fuelLiters = parseFloat(localStorage.getItem("fuel")) || tankCapacity;
+
+/* ================== RUNTIME STATE ================== */
+let speedKmph = 0;
+let running = false;
+let lastTimestamp = null;
+let tripDistance = 0;
+let tripSeconds = 0;
+
+/* ================== INIT ================== */
+updateUI();
+
+/* ================== ENGINE CONTROL ================== */
+function startDrive(){
+  if(running) return;
+  running = true;
+  lastTimestamp = Date.now();
+  loop();
+}
+
+function stopDrive(){
+  running = false;
+  speedKmph = 0;
+  saveData();
+  updateUI();
+}
+
+/* ================== SPEED CONTROL ================== */
+function increaseSpeed(){
+  if(!running) return;
+  speedKmph = Math.min(speedKmph + SPEED_STEP, MAX_SPEED);
+  updateUI();
+}
+
+function decreaseSpeed(){
+  if(!running) return;
+  speedKmph = Math.max(speedKmph - SPEED_STEP, 0);
+  updateUI();
+}
+
+/* ================== MAIN LOOP (SYSTEM CLOCK) ================== */
+function loop(){
+  if(!running) return;
+
+  const now = Date.now();
+  const elapsedSec = (now - lastTimestamp) / 1000;
+  lastTimestamp = now;
+
+  const distanceThisFrame = (speedKmph / 3600) * elapsedSec;
+
+  tripDistance += distanceThisFrame;
+  odometer += distanceThisFrame;
+
+  fuelLiters -= distanceThisFrame / mileage;
+  tripSeconds += elapsedSec;
+
+  if(fuelLiters <= 0){
+    fuelLiters = 0;
+    stopDrive();
+    return;
+  }
+
+  saveData();
+  updateUI();
+
+  requestAnimationFrame(loop);
+}
+
+/* ================== REFUEL ================== */
+function refuel(){
+  fuelLiters = tankCapacity;
+  saveData();
+  updateUI();
+}
+
+/* ================== STORAGE ================== */
+function saveData(){
+  localStorage.setItem("odometer", odometer.toFixed(2));
+  localStorage.setItem("fuel", fuelLiters.toFixed(2));
+}
+
+/* ================== UI ================== */
+function updateUI(){
+  document.getElementById("speedDial").textContent = speedKmph + " km/h";
+  document.getElementById("trip").textContent = tripDistance.toFixed(2);
+  document.getElementById("odo").textContent = odometer.toFixed(2);
+  document.getElementById("fuel").textContent =
+    Math.max((fuelLiters / tankCapacity) * 100, 0).toFixed(0);
+  document.getElementById("time").textContent = formatTime(tripSeconds);
+}
+
+function formatTime(sec){
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function pad(n){
+  return n.toString().padStart(2,"0");
+}
+</script>
+
+</body>
+</html>
